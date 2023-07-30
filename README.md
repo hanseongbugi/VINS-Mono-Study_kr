@@ -1,3 +1,8 @@
+# VINS-Mono-Study_kr
+* Vins-Mono를 공부하고 코드에 주석 처리 하였습니다.
+* 작업한 부분 까지  계속 commit 중입니다.
+
+
 # VINS-Mono
 ## A Robust and Versatile Monocular Visual-Inertial State Estimator
 
