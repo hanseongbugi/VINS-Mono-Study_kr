@@ -1127,20 +1127,20 @@ void Estimator::slideWindowOld()
 
 void Estimator::setReloFrame(double _frame_stamp, int _frame_index, vector<Vector3d> &_match_points, Vector3d _relo_t, Matrix3d _relo_r)
 {
-    relo_frame_stamp = _frame_stamp;
-    relo_frame_index = _frame_index;
-    match_points.clear();
-    match_points = _match_points;
-    prev_relo_t = _relo_t;
-    prev_relo_r = _relo_r;
+    relo_frame_stamp = _frame_stamp; // relocalization할 time stamp 저장
+    relo_frame_index = _frame_index; // relocalization할 frame index 저장
+    match_points.clear(); // 매칭 점 행렬 초기화
+    match_points = _match_points; // 매칭점 행렬을 인자로 들어온 값으로
+    prev_relo_t = _relo_t; // 변환 행렬
+    prev_relo_r = _relo_r; // 회전 행렬
     for(int i = 0; i < WINDOW_SIZE; i++)
     {
-        if(relo_frame_stamp == Headers[i].stamp.toSec())
+        if(relo_frame_stamp == Headers[i].stamp.toSec()) // relocalization할 frame의 time stamp가 지금까지 지나온 frame 중 하나라면 
         {
-            relo_frame_local_index = i;
-            relocalization_info = 1;
+            relo_frame_local_index = i; // 지나온 frame의 index를 저장
+            relocalization_info = 1; // relocalization할 수 있도록 frag 설정
             for (int j = 0; j < SIZE_POSE; j++)
-                relo_Pose[j] = para_Pose[i][j];
+                relo_Pose[j] = para_Pose[i][j]; // relocalization할 frame의 index에 해당하는 위치와 회전 행렬 값을 저장
         }
     }
 }

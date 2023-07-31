@@ -181,9 +181,9 @@ void feature_callback(const sensor_msgs::PointCloudConstPtr &feature_msg)
 
 void restart_callback(const std_msgs::BoolConstPtr &restart_msg)
 {
-    if (restart_msg->data == true)
+    if (restart_msg->data == true) // 다시 시작하라는 message 전달 시
     {
-        ROS_WARN("restart the estimator!");
+        ROS_WARN("restart the estimator!"); // 모든 값 초기화
         m_buf.lock();
         while(!feature_buf.empty())
             feature_buf.pop();
@@ -204,7 +204,7 @@ void relocalization_callback(const sensor_msgs::PointCloudConstPtr &points_msg)
 {
     //printf("relocalization callback! \n");
     m_buf.lock();
-    relo_buf.push(points_msg);
+    relo_buf.push(points_msg); // relocalization 버퍼에 massage 저장
     m_buf.unlock();
 }
 
@@ -278,20 +278,20 @@ void process()
             {
                 vector<Vector3d> match_points; // 매칭점을 담을 배열 생성
                 double frame_stamp = relo_msg->header.stamp.toSec(); // relocalization할 frame의 time stamp를 가져옴
-                for (unsigned int i = 0; i < relo_msg->points.size(); i++) 
+                for (unsigned int i = 0; i < relo_msg->points.size(); i++) // 매칭 점의 개수 만큼 순회
                 {
-                    Vector3d u_v_id;
-                    u_v_id.x() = relo_msg->points[i].x;
+                    Vector3d u_v_id; 
+                    u_v_id.x() = relo_msg->points[i].x; // 매칭점의 x, y, z 값을 저장
                     u_v_id.y() = relo_msg->points[i].y;
                     u_v_id.z() = relo_msg->points[i].z;
-                    match_points.push_back(u_v_id);
+                    match_points.push_back(u_v_id); // 배열에 삽입
                 }
-                Vector3d relo_t(relo_msg->channels[0].values[0], relo_msg->channels[0].values[1], relo_msg->channels[0].values[2]);
-                Quaterniond relo_q(relo_msg->channels[0].values[3], relo_msg->channels[0].values[4], relo_msg->channels[0].values[5], relo_msg->channels[0].values[6]);
-                Matrix3d relo_r = relo_q.toRotationMatrix();
+                Vector3d relo_t(relo_msg->channels[0].values[0], relo_msg->channels[0].values[1], relo_msg->channels[0].values[2]); // keyframe에 대한 변환 행렬
+                Quaterniond relo_q(relo_msg->channels[0].values[3], relo_msg->channels[0].values[4], relo_msg->channels[0].values[5], relo_msg->channels[0].values[6]); // key frame에 대한 회전 행렬
+                Matrix3d relo_r = relo_q.toRotationMatrix(); // 쿼터니안을 Matrix로 변환
                 int frame_index;
-                frame_index = relo_msg->channels[0].values[7];
-                estimator.setReloFrame(frame_stamp, frame_index, match_points, relo_t, relo_r);
+                frame_index = relo_msg->channels[0].values[7]; // frame의 index 저장
+                estimator.setReloFrame(frame_stamp, frame_index, match_points, relo_t, relo_r); // relocalization할 frame 설정
             }
 
             ROS_DEBUG("processing vision data with stamp %f \n", img_msg->header.stamp.toSec());
