@@ -29,10 +29,10 @@ class IntegrationBase
 
     void push_back(double dt, const Eigen::Vector3d &acc, const Eigen::Vector3d &gyr)
     {
-        dt_buf.push_back(dt);
-        acc_buf.push_back(acc);
-        gyr_buf.push_back(gyr);
-        propagate(dt, acc, gyr);
+        dt_buf.push_back(dt); // dt 버퍼에 인자로 들어온 값 저장
+        acc_buf.push_back(acc); // acc 버퍼에 인자로 들어온 값 저장
+        gyr_buf.push_back(gyr); // gyr 버퍼에 인자로 들어온 값 저장
+        propagate(dt, acc, gyr); // dt, acc, gyr 값을 객체에 저장하고 integration 진행
     }
 
     void repropagate(const Eigen::Vector3d &_linearized_ba, const Eigen::Vector3d &_linearized_bg)
@@ -60,15 +60,15 @@ class IntegrationBase
                             Eigen::Vector3d &result_linearized_ba, Eigen::Vector3d &result_linearized_bg, bool update_jacobian)
     {
         //ROS_INFO("midpoint integration");
-        Vector3d un_acc_0 = delta_q * (_acc_0 - linearized_ba);
-        Vector3d un_gyr = 0.5 * (_gyr_0 + _gyr_1) - linearized_bg;
-        result_delta_q = delta_q * Quaterniond(1, un_gyr(0) * _dt / 2, un_gyr(1) * _dt / 2, un_gyr(2) * _dt / 2);
-        Vector3d un_acc_1 = result_delta_q * (_acc_1 - linearized_ba);
-        Vector3d un_acc = 0.5 * (un_acc_0 + un_acc_1);
-        result_delta_p = delta_p + delta_v * _dt + 0.5 * un_acc * _dt * _dt;
-        result_delta_v = delta_v + un_acc * _dt;
-        result_linearized_ba = linearized_ba;
-        result_linearized_bg = linearized_bg;         
+        Vector3d un_acc_0 = delta_q * (_acc_0 - linearized_ba); // 연산전 이전 가속도 값 = 이전 회전 행렬 * (이전 가속도 값 - bias)
+        Vector3d un_gyr = 0.5 * (_gyr_0 + _gyr_1) - linearized_bg; // 연산 전 자이로 값 = 이전 자이로 값과 현재 자이로 값의 평균 - bias
+        result_delta_q = delta_q * Quaterniond(1, un_gyr(0) * _dt / 2, un_gyr(1) * _dt / 2, un_gyr(2) * _dt / 2); // 현재 회전 행렬 값을 이전 위치와 회전 속도를 통해 구함
+        Vector3d un_acc_1 = result_delta_q * (_acc_1 - linearized_ba); // 연산전 현재 가속도 값 = 현재 회전 행렬 * (현재 가속도 값 - bias)
+        Vector3d un_acc = 0.5 * (un_acc_0 + un_acc_1); // 두개의 가속도 값의 평균을 통해 연산에 필요한 가속도 값을 구함
+        result_delta_p = delta_p + delta_v * _dt + 0.5 * un_acc * _dt * _dt; // 현재 위치 = 이전 위치 + 이전 속도 * dt + 가속도 값 / 2 * dt^2
+        result_delta_v = delta_v + un_acc * _dt; // 현재 속도 = 이전 속도 + 가속도 값 * dt
+        result_linearized_ba = linearized_ba; // bias 갱신
+        result_linearized_bg = linearized_bg; // bias 갱신
 
         if(update_jacobian)
         {
@@ -129,8 +129,8 @@ class IntegrationBase
 
     void propagate(double _dt, const Eigen::Vector3d &_acc_1, const Eigen::Vector3d &_gyr_1)
     {
-        dt = _dt;
-        acc_1 = _acc_1;
+        dt = _dt; // 인자로 들어온 dt, acc, gyr 값 저장
+        acc_1 = _acc_1; 
         gyr_1 = _gyr_1;
         Vector3d result_delta_p;
         Quaterniond result_delta_q;
@@ -141,19 +141,19 @@ class IntegrationBase
         midPointIntegration(_dt, acc_0, gyr_0, _acc_1, _gyr_1, delta_p, delta_q, delta_v,
                             linearized_ba, linearized_bg,
                             result_delta_p, result_delta_q, result_delta_v,
-                            result_linearized_ba, result_linearized_bg, 1);
+                            result_linearized_ba, result_linearized_bg, 1); // integration 진행
 
         //checkJacobian(_dt, acc_0, gyr_0, acc_1, gyr_1, delta_p, delta_q, delta_v,
         //                    linearized_ba, linearized_bg);
-        delta_p = result_delta_p;
+        delta_p = result_delta_p; // integration 결과 값을 객체에 저장 
         delta_q = result_delta_q;
         delta_v = result_delta_v;
         linearized_ba = result_linearized_ba;
         linearized_bg = result_linearized_bg;
-        delta_q.normalize();
-        sum_dt += dt;
-        acc_0 = acc_1;
-        gyr_0 = gyr_1;  
+        delta_q.normalize(); // 회전 행렬 normalization
+        sum_dt += dt; // dt의 합 갱신
+        acc_0 = acc_1; // 이전 가속도 값 갱신
+        gyr_0 = gyr_1; // 이전 자이로 값 갱신
      
     }
 

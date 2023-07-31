@@ -83,38 +83,38 @@ void Estimator::clearState()
 
 void Estimator::processIMU(double dt, const Vector3d &linear_acceleration, const Vector3d &angular_velocity)
 {
-    if (!first_imu)
+    if (!first_imu) // 첫번째 imu 데이터를 받지 못한 경우
     {
-        first_imu = true;
-        acc_0 = linear_acceleration;
-        gyr_0 = angular_velocity;
+        first_imu = true; // 첫번째 imu 데이터를 받았다고 flag 설정
+        acc_0 = linear_acceleration; // 가속도 값을 인자로 받은 값으로 설정
+        gyr_0 = angular_velocity; // 자이로 값을 인자로 받은 값으로 설정
     }
 
-    if (!pre_integrations[frame_count])
+    if (!pre_integrations[frame_count]) // frame 번호에 해당하는 preIntegration 객체가 없는 경우
     {
-        pre_integrations[frame_count] = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]};
+        pre_integrations[frame_count] = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]}; // IntegrationBase 객체 생성 (Integration에 필요한 행렬 초기화)
     }
-    if (frame_count != 0)
+    if (frame_count != 0) // frame이 있는 경우
     {
-        pre_integrations[frame_count]->push_back(dt, linear_acceleration, angular_velocity);
+        pre_integrations[frame_count]->push_back(dt, linear_acceleration, angular_velocity); // dt와 가속도, 자이로 센서 값을 통해 preintegration 진행
         //if(solver_flag != NON_LINEAR)
-            tmp_pre_integration->push_back(dt, linear_acceleration, angular_velocity);
+            tmp_pre_integration->push_back(dt, linear_acceleration, angular_velocity); // 같은 값으로 한번더 integration 진행
 
-        dt_buf[frame_count].push_back(dt);
-        linear_acceleration_buf[frame_count].push_back(linear_acceleration);
-        angular_velocity_buf[frame_count].push_back(angular_velocity);
+        dt_buf[frame_count].push_back(dt); // dt 버퍼에 dt 값 저장
+        linear_acceleration_buf[frame_count].push_back(linear_acceleration); // 가속도 버퍼에 가속도 값 저장 
+        angular_velocity_buf[frame_count].push_back(angular_velocity); // 자이로 버퍼에 자이로 값 저장
 
         int j = frame_count;         
-        Vector3d un_acc_0 = Rs[j] * (acc_0 - Bas[j]) - g;
-        Vector3d un_gyr = 0.5 * (gyr_0 + angular_velocity) - Bgs[j];
-        Rs[j] *= Utility::deltaQ(un_gyr * dt).toRotationMatrix();
-        Vector3d un_acc_1 = Rs[j] * (linear_acceleration - Bas[j]) - g;
-        Vector3d un_acc = 0.5 * (un_acc_0 + un_acc_1);
-        Ps[j] += dt * Vs[j] + 0.5 * dt * dt * un_acc;
-        Vs[j] += dt * un_acc;
+        Vector3d un_acc_0 = Rs[j] * (acc_0 - Bas[j]) - g; //현재 프레임 번호에 대한 가속도 값
+        Vector3d un_gyr = 0.5 * (gyr_0 + angular_velocity) - Bgs[j]; // 현재 프레임 번호에 대한 자이로 값
+        Rs[j] *= Utility::deltaQ(un_gyr * dt).toRotationMatrix(); //회전 행렬 값 갱신 (자이로 값을 통해)
+        Vector3d un_acc_1 = Rs[j] * (linear_acceleration - Bas[j]) - g; // 겡신된 회전 행렬 값을 통해 현재 가속도 값 계산
+        Vector3d un_acc = 0.5 * (un_acc_0 + un_acc_1); // 두 값의 평균을 구함
+        Ps[j] += dt * Vs[j] + 0.5 * dt * dt * un_acc; //위치 갱신
+        Vs[j] += dt * un_acc; // 속도 갱신
     }
-    acc_0 = linear_acceleration;
-    gyr_0 = angular_velocity;
+    acc_0 = linear_acceleration; // 가속도 값을 인자로 받은 값으로 설정
+    gyr_0 = angular_velocity; // 자이로 값을 인자로 받은 값으로 설정
 }
 
 void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, const std_msgs::Header &header)

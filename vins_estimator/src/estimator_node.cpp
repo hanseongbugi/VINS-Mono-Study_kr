@@ -82,7 +82,7 @@ void update()
     TicToc t_predict;
     latest_time = current_time;
     tmp_P = estimator.Ps[WINDOW_SIZE]; //위치
-    tmp_Q = estimator.Rs[WINDOW_SIZE]; // IMU 센서의 위치 및 방향을 나타내는 회전 행렬ㄴ
+    tmp_Q = estimator.Rs[WINDOW_SIZE]; // IMU 센서의 위치 및 방향을 나타내는 회전 행렬
     tmp_V = estimator.Vs[WINDOW_SIZE]; //속도 
     tmp_Ba = estimator.Bas[WINDOW_SIZE]; //가속도 bias 값
     tmp_Bg = estimator.Bgs[WINDOW_SIZE]; //자이로 bias 값
@@ -98,41 +98,44 @@ void update()
 std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>>
 getMeasurements()
 {
-    std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>> measurements;
+    std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>> measurements; // 센서 측정 값을 담는 배열
 
     while (true)
     {
-        if (imu_buf.empty() || feature_buf.empty())
-            return measurements;
+        if (imu_buf.empty() || feature_buf.empty()) // imu 버퍼와 feature 버퍼가 비어 있으면 
+            return measurements; // 배열을 반환하고 종료
 
+        // 가장 최근에 들어온 센서 값의 time stamp 값이 버퍼의 가장 앞에 있는 이미지의 time stamp + imu 시간과 이미지 시간과의 차이 값보다 작거나 같으면
+        //  => 최근에 수집된 센서 데이터가 버퍼의 첫 이미지보다 이전에 수집되었다면
         if (!(imu_buf.back()->header.stamp.toSec() > feature_buf.front()->header.stamp.toSec() + estimator.td))
         {
             //ROS_WARN("wait for imu, only should happen at the beginning");
-            sum_of_wait++;
-            return measurements;
+            sum_of_wait++; // 센서 데이터 대기 횟수 증가
+            return measurements; // 배열을 반환하고 종료
         }
-
+        // 가장 먼저 들어온 센서 값의 time stamp 값이 버퍼의 가장 앞에 있는 이미지의 time stamp + imu 시간과 이미지 시간과의 차이 값보다 크거나 같으면
+        //  => 가장 먼저 수집된 센서 데이터가 버퍼의 첫 이미지 이후에 수집되었다면
         if (!(imu_buf.front()->header.stamp.toSec() < feature_buf.front()->header.stamp.toSec() + estimator.td))
         {
             ROS_WARN("throw img, only should happen at the beginning");
-            feature_buf.pop();
-            continue;
+            feature_buf.pop(); //feature 버퍼의 앞에 있는 이미지 정보를 버린다.
+            continue; // 다음 loop로 이동
         }
-        sensor_msgs::PointCloudConstPtr img_msg = feature_buf.front();
-        feature_buf.pop();
+        sensor_msgs::PointCloudConstPtr img_msg = feature_buf.front(); // feature 버퍼의 가장 앞에 있는 이미지 정보를 가져옴
+        feature_buf.pop(); // 가장 앞에 있는 이미지 정보를 버퍼에서 버린다.
 
-        std::vector<sensor_msgs::ImuConstPtr> IMUs;
-        while (imu_buf.front()->header.stamp.toSec() < img_msg->header.stamp.toSec() + estimator.td)
+        std::vector<sensor_msgs::ImuConstPtr> IMUs; // imu 정보를 담을 배열
+        while (imu_buf.front()->header.stamp.toSec() < img_msg->header.stamp.toSec() + estimator.td) // 센서의 time stamp가 이미지의 time stamp보다 작으면 반복
         {
-            IMUs.emplace_back(imu_buf.front());
-            imu_buf.pop();
+            IMUs.emplace_back(imu_buf.front()); // 배열에 센서 데이터를 넣고
+            imu_buf.pop(); //버퍼에서 정보 제거
         }
-        IMUs.emplace_back(imu_buf.front());
-        if (IMUs.empty())
+        IMUs.emplace_back(imu_buf.front()); // 반복 조건에서 빠져 나온 경우의 imu 데이터도 배열에 저장
+        if (IMUs.empty()) // 배열이 비어 있다면
             ROS_WARN("no imu between two image");
-        measurements.emplace_back(IMUs, img_msg);
+        measurements.emplace_back(IMUs, img_msg); // 센서 측정 값을 담는 배열에 imu 배열과 image 정보를 넣는다.
     }
-    return measurements;
+    return measurements; // 측정 배열 반환
 }
 
 void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg)
@@ -164,16 +167,16 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg)
 
 void feature_callback(const sensor_msgs::PointCloudConstPtr &feature_msg)
 {
-    if (!init_feature)
+    if (!init_feature) // 처음 이미지 데이터가 들어오면 무시
     {
         //skip the first detected feature, which doesn't contain optical flow speed
         init_feature = 1;
         return;
     }
-    m_buf.lock();
+    m_buf.lock(); // lock
     feature_buf.push(feature_msg);
-    m_buf.unlock();
-    con.notify_one();
+    m_buf.unlock(); // unlock
+    con.notify_one(); // sleep하고 있는 스레드 중 하나를 깨운다.
 }
 
 void restart_callback(const std_msgs::BoolConstPtr &restart_msg)
@@ -211,71 +214,71 @@ void process()
 {
     while (true)
     {
-        std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>> measurements;
-        std::unique_lock<std::mutex> lk(m_buf);
+        std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>> measurements; // 센서 측정 값을 담는 배열 생성
+        std::unique_lock<std::mutex> lk(m_buf); // 락 변수 선언
         con.wait(lk, [&]
                  {
             return (measurements = getMeasurements()).size() != 0;
-                 });
-        lk.unlock();
-        m_estimator.lock();
-        for (auto &measurement : measurements)
+                 }); // 측정 데이터가 들어올 때 까지 대기
+        lk.unlock(); // unlock
+        m_estimator.lock(); // lock
+        for (auto &measurement : measurements) // 센서 측정 값 배열의 요소를 순회
         {
-            auto img_msg = measurement.second;
+            auto img_msg = measurement.second; // image 정보를 가져온다.
             double dx = 0, dy = 0, dz = 0, rx = 0, ry = 0, rz = 0;
-            for (auto &imu_msg : measurement.first)
+            for (auto &imu_msg : measurement.first) // 해당 image 이전에 측정된 imu 데이터를 순회
             {
-                double t = imu_msg->header.stamp.toSec();
-                double img_t = img_msg->header.stamp.toSec() + estimator.td;
-                if (t <= img_t)
+                double t = imu_msg->header.stamp.toSec(); // imu 데이터의 time stamp를 가져온다.
+                double img_t = img_msg->header.stamp.toSec() + estimator.td; // 이미지 time stamp에 imu와의 시간 차이를 더해서 이미지의 time stamp로 함
+                if (t <= img_t) // imu의 time stamp가 이미지의 time stamp보다 작거나 같으면
                 { 
-                    if (current_time < 0)
-                        current_time = t;
-                    double dt = t - current_time;
-                    ROS_ASSERT(dt >= 0);
-                    current_time = t;
-                    dx = imu_msg->linear_acceleration.x;
+                    if (current_time < 0) // 현재 시간이 초기화되지 않았으면
+                        current_time = t; // 현재 시간을 imu의 time stamp로 초기화
+                    double dt = t - current_time; // dt를 imu의 time stamp와 현재 시간의 차이 값으로 함
+                    ROS_ASSERT(dt >= 0); // dt가 0보다 작은 경우 프로그램이 멈추고 오류 메시지를 출력
+                    current_time = t; // 현재 시간을 imu의 time stamp로 초기화
+                    dx = imu_msg->linear_acceleration.x; // 가속도 센서의 x, y, z 값을 가져옴
                     dy = imu_msg->linear_acceleration.y;
                     dz = imu_msg->linear_acceleration.z;
-                    rx = imu_msg->angular_velocity.x;
+                    rx = imu_msg->angular_velocity.x; // 자이로 센서의 x, y, z 값을 가져옴
                     ry = imu_msg->angular_velocity.y;
                     rz = imu_msg->angular_velocity.z;
-                    estimator.processIMU(dt, Vector3d(dx, dy, dz), Vector3d(rx, ry, rz));
+                    estimator.processIMU(dt, Vector3d(dx, dy, dz), Vector3d(rx, ry, rz)); // dt와 가속도 센서 값, 자이로 센서 값을 넣고 속도, 위치, 회전 추정
                     //printf("imu: dt:%f a: %f %f %f w: %f %f %f\n",dt, dx, dy, dz, rx, ry, rz);
 
                 }
-                else
+                else // 큰 경우
                 {
-                    double dt_1 = img_t - current_time;
-                    double dt_2 = t - img_t;
-                    current_time = img_t;
-                    ROS_ASSERT(dt_1 >= 0);
-                    ROS_ASSERT(dt_2 >= 0);
-                    ROS_ASSERT(dt_1 + dt_2 > 0);
-                    double w1 = dt_2 / (dt_1 + dt_2);
+                    double dt_1 = img_t - current_time; // 이미지의 time stamp와 현재 시간의 차이를 dt_1로
+                    double dt_2 = t - img_t; // imu time stamp와 image time stamp의 차이를 dt_2로
+                    current_time = img_t; // 현재 시간 갱신
+                    ROS_ASSERT(dt_1 >= 0); // dt_1이 0보다 작은 경우 종료
+                    ROS_ASSERT(dt_2 >= 0); // dt_2가 0보다 작은 경우 종료
+                    ROS_ASSERT(dt_1 + dt_2 > 0); // dt_1 + dt_2가 0 이하인 경우 종료
+                    double w1 = dt_2 / (dt_1 + dt_2); //dt_1과 dt_2의 가중치를 구함
                     double w2 = dt_1 / (dt_1 + dt_2);
-                    dx = w1 * dx + w2 * imu_msg->linear_acceleration.x;
+                    dx = w1 * dx + w2 * imu_msg->linear_acceleration.x; // 가중치를 통해 값을 혼합하여 자이로 가속도 값을 추정
                     dy = w1 * dy + w2 * imu_msg->linear_acceleration.y;
                     dz = w1 * dz + w2 * imu_msg->linear_acceleration.z;
                     rx = w1 * rx + w2 * imu_msg->angular_velocity.x;
                     ry = w1 * ry + w2 * imu_msg->angular_velocity.y;
                     rz = w1 * rz + w2 * imu_msg->angular_velocity.z;
-                    estimator.processIMU(dt_1, Vector3d(dx, dy, dz), Vector3d(rx, ry, rz));
+                    estimator.processIMU(dt_1, Vector3d(dx, dy, dz), Vector3d(rx, ry, rz)); // dt와 가속도 센서 값, 자이로 센서 값을 넣고 속도, 위치, 회전 추정
                     //printf("dimu: dt:%f a: %f %f %f w: %f %f %f\n",dt_1, dx, dy, dz, rx, ry, rz);
                 }
             }
             // set relocalization frame
-            sensor_msgs::PointCloudConstPtr relo_msg = NULL;
-            while (!relo_buf.empty())
+            sensor_msgs::PointCloudConstPtr relo_msg = NULL; // relocalization massage 포인터 생성
+            while (!relo_buf.empty()) // 버퍼에 내용이 있으면
             {
-                relo_msg = relo_buf.front();
+                relo_msg = relo_buf.front(); // 버퍼의 앞 부분을 꺼낸다.
                 relo_buf.pop();
             }
-            if (relo_msg != NULL)
+            if (relo_msg != NULL) // massage에 내용이 있으면
             {
-                vector<Vector3d> match_points;
-                double frame_stamp = relo_msg->header.stamp.toSec();
-                for (unsigned int i = 0; i < relo_msg->points.size(); i++)
+                vector<Vector3d> match_points; // 매칭점을 담을 배열 생성
+                double frame_stamp = relo_msg->header.stamp.toSec(); // relocalization할 frame의 time stamp를 가져옴
+                for (unsigned int i = 0; i < relo_msg->points.size(); i++) 
                 {
                     Vector3d u_v_id;
                     u_v_id.x() = relo_msg->points[i].x;
