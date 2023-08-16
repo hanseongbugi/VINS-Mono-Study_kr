@@ -192,38 +192,38 @@ namespace cv {
 
 bool MotionEstimator::solveRelativeRT(const vector<pair<Vector3d, Vector3d>> &corres, Matrix3d &Rotation, Vector3d &Translation)
 {
-    if (corres.size() >= 15)
+    if (corres.size() >= 15) // correspondent가 15개 이상인 경우
     {
         vector<cv::Point2f> ll, rr;
         for (int i = 0; i < int(corres.size()); i++)
         {
-            ll.push_back(cv::Point2f(corres[i].first(0), corres[i].first(1)));
+            ll.push_back(cv::Point2f(corres[i].first(0), corres[i].first(1))); // correspondent인 점들의 좌표를 저장
             rr.push_back(cv::Point2f(corres[i].second(0), corres[i].second(1)));
         }
         cv::Mat mask;
-        cv::Mat E = cv::findFundamentalMat(ll, rr, cv::FM_RANSAC, 0.3 / 460, 0.99, mask);
-        cv::Mat cameraMatrix = (cv::Mat_<double>(3, 3) << 1, 0, 0, 0, 1, 0, 0, 0, 1);
+        cv::Mat E = cv::findFundamentalMat(ll, rr, cv::FM_RANSAC, 0.3 / 460, 0.99, mask); // 점들을 통해 Fundamental Matrix를 구함, 이때 RANSAC을 통해 계산
+        cv::Mat cameraMatrix = (cv::Mat_<double>(3, 3) << 1, 0, 0, 0, 1, 0, 0, 0, 1); //카메라 행렬 초기화
         cv::Mat rot, trans;
-        int inlier_cnt = cv::recoverPose(E, ll, rr, cameraMatrix, rot, trans, mask);
+        int inlier_cnt = cv::recoverPose(E, ll, rr, cameraMatrix, rot, trans, mask); //인라이어를 통해 상대적인 회전 행렬(rot)과 위치 행렬(trans) 계산, 이때 인라이어 수도 반환
         //cout << "inlier_cnt " << inlier_cnt << endl;
 
         Eigen::Matrix3d R;
         Eigen::Vector3d T;
         for (int i = 0; i < 3; i++)
         {   
-            T(i) = trans.at<double>(i, 0);
+            T(i) = trans.at<double>(i, 0); // 위치 행렬 값 저장
             for (int j = 0; j < 3; j++)
-                R(i, j) = rot.at<double>(i, j);
+                R(i, j) = rot.at<double>(i, j); // 회전 행렬 값 저장
         }
 
-        Rotation = R.transpose();
-        Translation = -R.transpose() * T;
-        if(inlier_cnt > 12)
-            return true;
+        Rotation = R.transpose(); // 회전 행렬 값을 전치하여 저장
+        Translation = -R.transpose() * T; // 회전 행렬 값에 음수를 곱하고 전치하여 위치 행렬과 곱하여 저장
+        if(inlier_cnt > 12) // 인라이어의 개수가 12개 이상인 경우
+            return true; // 성공
         else
-            return false;
+            return false; // 실패
     }
-    return false;
+    return false; // 실패
 }
 
 

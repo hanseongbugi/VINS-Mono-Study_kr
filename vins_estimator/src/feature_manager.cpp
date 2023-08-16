@@ -46,53 +46,55 @@ bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vec
 {
     ROS_DEBUG("input feature: %d", (int)image.size());
     ROS_DEBUG("num of feature: %d", getFeatureCount());
-    double parallax_sum = 0;
-    int parallax_num = 0;
-    last_track_num = 0;
+    double parallax_sum = 0; // parallax 거리의 합
+    int parallax_num = 0; // parallax를 계산 수
+    last_track_num = 0; // tracking 수
     for (auto &id_pts : image)
     {
-        FeaturePerFrame f_per_fra(id_pts.second[0].second, td);
+        FeaturePerFrame f_per_fra(id_pts.second[0].second, td); // 특정 frame에 관한 특정점 정보를 담는 객체 생성 (0번째 카메라에 대한 특징점 행렬과 td 사용)
 
-        int feature_id = id_pts.first;
+        int feature_id = id_pts.first; // 특징점 id 값 저장
         auto it = find_if(feature.begin(), feature.end(), [feature_id](const FeaturePerId &it)
                           {
             return it.feature_id == feature_id;
-                          });
+                          }); // feature_id와 일치하는 FeaturePerId객체를 찾는다. (it은 feature 배열에 있는 FeaturePerId객체)
 
-        if (it == feature.end())
+        if (it == feature.end()) // feature_id와 같은 FeaturePerId 객체가 없다면
         {
-            feature.push_back(FeaturePerId(feature_id, frame_count));
-            feature.back().feature_per_frame.push_back(f_per_fra);
+            feature.push_back(FeaturePerId(feature_id, frame_count)); // feature 배열에 feature_id에 해당하는 FeaturePerId객체를 생성하고 삽입
+            feature.back().feature_per_frame.push_back(f_per_fra); // 방금 삽입한 객체의 feature_per_frame 배열에 FeaturePerFrame 객체 삽입
         }
-        else if (it->feature_id == feature_id)
+        else if (it->feature_id == feature_id) // feature_id와 같은 객체를 찾았다면
         {
-            it->feature_per_frame.push_back(f_per_fra);
-            last_track_num++;
+            it->feature_per_frame.push_back(f_per_fra); // 찾은 객체의 feature_per_frame 객체에 FeaturePerFrame 객체 삽입
+            last_track_num++; // tracking 수 증가
         }
     }
 
-    if (frame_count < 2 || last_track_num < 20)
-        return true;
+    if (frame_count < 2 || last_track_num < 20) // frame count가 2보다 작거나 tracking 수가 20보다 작으면
+        return true; // true를 반환하고 함수 종료
 
-    for (auto &it_per_id : feature)
+    for (auto &it_per_id : feature) // FeaturePerId 객체를 담고있는 feature 배열 순회
     {
+        // feature 배열에 있는 객체의 start_frame이 frame_count - 2 보다 작거나 같고, start_framer과 feature_per_frame 배열의 크기가 frame count -1보다 크거나 같으면
+        //  => 배열에 있는 객체의 frame이 이전 frame이면
         if (it_per_id.start_frame <= frame_count - 2 &&
-            it_per_id.start_frame + int(it_per_id.feature_per_frame.size()) - 1 >= frame_count - 1)
+            it_per_id.start_frame + int(it_per_id.feature_per_frame.size()) - 1 >= frame_count - 1) 
         {
-            parallax_sum += compensatedParallax2(it_per_id, frame_count);
-            parallax_num++;
+            parallax_sum += compensatedParallax2(it_per_id, frame_count); // FeaturePerId 객체와 frame_count를 통해 Parallax 추정하고 거리를 반환 받음
+            parallax_num++; // parallax 계산 수 증가
         }
     }
 
-    if (parallax_num == 0)
+    if (parallax_num == 0) // parallax를 구하지 못하였다면
     {
-        return true;
+        return true; // true를 반환하고 함수 종료
     }
     else
     {
         ROS_DEBUG("parallax_sum: %lf, parallax_num: %d", parallax_sum, parallax_num);
         ROS_DEBUG("current parallax: %lf", parallax_sum / parallax_num * FOCAL_LENGTH);
-        return parallax_sum / parallax_num >= MIN_PARALLAX;
+        return parallax_sum / parallax_num >= MIN_PARALLAX; // 거리 합 / 거리 계산 수(거리 평균)가 최소 Parallax 값(10, config파일에 있는 정보)보다 크거나 같으면 true
     }
 }
 
@@ -119,20 +121,22 @@ void FeatureManager::debugShow()
 
 vector<pair<Vector3d, Vector3d>> FeatureManager::getCorresponding(int frame_count_l, int frame_count_r)
 {
-    vector<pair<Vector3d, Vector3d>> corres;
-    for (auto &it : feature)
+    vector<pair<Vector3d, Vector3d>> corres; //corespondent인 특징점 위치를 저장하는 배열
+    for (auto &it : feature) // FeaturePerId 객체를 담고있는 feature 배열 순회
     {
-        if (it.start_frame <= frame_count_l && it.endFrame() >= frame_count_r)
+        // 배열에 있는 frame이 이전 프레임 번호보다 작거나 같고 객체의 마지막 프레임 번호가 현재 프레임번호보다 크거나 같으면
+        // 값들이 사이에 존재한다면
+        if (it.start_frame <= frame_count_l && it.endFrame() >= frame_count_r) 
         {
-            Vector3d a = Vector3d::Zero(), b = Vector3d::Zero();
-            int idx_l = frame_count_l - it.start_frame;
-            int idx_r = frame_count_r - it.start_frame;
+            Vector3d a = Vector3d::Zero(), b = Vector3d::Zero(); // vector 초기화
+            int idx_l = frame_count_l - it.start_frame; // left 프레임 idx를 이전 프레임 번호 - 객체의 프레임 id
+            int idx_r = frame_count_r - it.start_frame; // right 프레임 idx를 현재 프레임 번호 - 객체의 프레임 id
 
-            a = it.feature_per_frame[idx_l].point;
+            a = it.feature_per_frame[idx_l].point; // id에 해당하는 특징점을 가져온다
 
-            b = it.feature_per_frame[idx_r].point;
+            b = it.feature_per_frame[idx_r].point; // id에 해당하는 특징점을 가져온다
             
-            corres.push_back(make_pair(a, b));
+            corres.push_back(make_pair(a, b)); // 2개의 특징점을 corespondent 배열에 삽입
         }
     }
     return corres;
@@ -171,32 +175,32 @@ void FeatureManager::removeFailures()
 
 void FeatureManager::clearDepth(const VectorXd &x)
 {
-    int feature_index = -1;
-    for (auto &it_per_id : feature)
+    int feature_index = -1; // feature index 초기화
+    for (auto &it_per_id : feature) // feature 배열 순회
     {
-        it_per_id.used_num = it_per_id.feature_per_frame.size();
-        if (!(it_per_id.used_num >= 2 && it_per_id.start_frame < WINDOW_SIZE - 2))
-            continue;
-        it_per_id.estimated_depth = 1.0 / x(++feature_index);
+        it_per_id.used_num = it_per_id.feature_per_frame.size(); // feature_per_frame 배열의 크기를 used_num(feature가 사용된 frame 수)에 저장
+        if (!(it_per_id.used_num >= 2 && it_per_id.start_frame < WINDOW_SIZE - 2)) // used_num의 크기가 2 이상이고 시작 프레임이 WINDOWSIZE-2(8)보다 작으면
+            continue; // 무시
+        it_per_id.estimated_depth = 1.0 / x(++feature_index);  // feature의 depth를 인자로 들어온 x 배열의 값으로 변경 ( x 배열의 depth는 역수 이기에 다시 역수를 취함)
     }
 }
 
 VectorXd FeatureManager::getDepthVector()
 {
-    VectorXd dep_vec(getFeatureCount());
-    int feature_index = -1;
-    for (auto &it_per_id : feature)
+    VectorXd dep_vec(getFeatureCount()); // feature의 개수만큼 크기를 가진 Nx1 행렬 생성
+    int feature_index = -1; // feature index 초기화
+    for (auto &it_per_id : feature) // feature 배열 순회
     {
-        it_per_id.used_num = it_per_id.feature_per_frame.size();
-        if (!(it_per_id.used_num >= 2 && it_per_id.start_frame < WINDOW_SIZE - 2))
-            continue;
+        it_per_id.used_num = it_per_id.feature_per_frame.size(); // feature_per_frame 배열의 크기를 used_num(feature가 사용된 frame 수)에 저장
+        if (!(it_per_id.used_num >= 2 && it_per_id.start_frame < WINDOW_SIZE - 2)) // used_num의 크기가 2 이상이고 시작 프레임이 WINDOWSIZE-2(8)보다 작으면
+            continue; // 무시
 #if 1
-        dep_vec(++feature_index) = 1. / it_per_id.estimated_depth;
+        dep_vec(++feature_index) = 1. / it_per_id.estimated_depth; // feature의 depth의 역수를 배열 저장
 #else
-        dep_vec(++feature_index) = it_per_id->estimated_depth;
+        dep_vec(++feature_index) = it_per_id->estimated_depth; // 컴파일되지 않는 부분임 ( if 1은 항상 참이기 때문 )
 #endif
     }
-    return dep_vec;
+    return dep_vec; // dep_vec 배열 반환
 }
 
 void FeatureManager::triangulate(Vector3d Ps[], Vector3d tic[], Matrix3d ric[])
@@ -356,33 +360,33 @@ double FeatureManager::compensatedParallax2(const FeaturePerId &it_per_id, int f
 {
     //check the second last frame is keyframe or not
     //parallax betwwen seconde last frame and third last frame
-    const FeaturePerFrame &frame_i = it_per_id.feature_per_frame[frame_count - 2 - it_per_id.start_frame];
-    const FeaturePerFrame &frame_j = it_per_id.feature_per_frame[frame_count - 1 - it_per_id.start_frame];
+    const FeaturePerFrame &frame_i = it_per_id.feature_per_frame[frame_count - 2 - it_per_id.start_frame]; // FeaturePerId객체의 start_frame 기준 세번째 마지막 프레임 정보
+    const FeaturePerFrame &frame_j = it_per_id.feature_per_frame[frame_count - 1 - it_per_id.start_frame]; // FeaturePerId객체의 start_frame 기준 두번째 마지막 프레임 정보
 
-    double ans = 0;
-    Vector3d p_j = frame_j.point;
+    double ans = 0; // parallax 값
+    Vector3d p_j = frame_j.point; // 두번째 마지막 프레임의 특징점 위치
 
-    double u_j = p_j(0);
-    double v_j = p_j(1);
+    double u_j = p_j(0); // 특징점의 x 값
+    double v_j = p_j(1); // 특징점의 y 값
 
-    Vector3d p_i = frame_i.point;
-    Vector3d p_i_comp;
+    Vector3d p_i = frame_i.point; // 세번째 마지막 프레임의 특징점 위치
+    Vector3d p_i_comp; 
 
     //int r_i = frame_count - 2;
     //int r_j = frame_count - 1;
     //p_i_comp = ric[camera_id_j].transpose() * Rs[r_j].transpose() * Rs[r_i] * ric[camera_id_i] * p_i;
-    p_i_comp = p_i;
-    double dep_i = p_i(2);
-    double u_i = p_i(0) / dep_i;
-    double v_i = p_i(1) / dep_i;
-    double du = u_i - u_j, dv = v_i - v_j;
+    p_i_comp = p_i; // p_i_comp에 p_i 값 복사
+    double dep_i = p_i(2); // 세번째 마지막 프레임의 z 값 (depth)
+    double u_i = p_i(0) / dep_i; // x값에 depth를 나누어 특징점의 2D 위치를 구함
+    double v_i = p_i(1) / dep_i; // y값에 depth를 나누어 특징점의 2D 위치를 구함
+    double du = u_i - u_j, dv = v_i - v_j; // 두 프레임 간의 2D 위치 차이를 계산
 
-    double dep_i_comp = p_i_comp(2);
-    double u_i_comp = p_i_comp(0) / dep_i_comp;
-    double v_i_comp = p_i_comp(1) / dep_i_comp;
-    double du_comp = u_i_comp - u_j, dv_comp = v_i_comp - v_j;
+    double dep_i_comp = p_i_comp(2); // 세번째 마지막 프레임의 z 값 (depth)
+    double u_i_comp = p_i_comp(0) / dep_i_comp; // x값에 depth를 나누어 특징점의 2D 위치를 구함
+    double v_i_comp = p_i_comp(1) / dep_i_comp; // y값에 depth를 나누어 특징점의 2D 위치를 구함
+    double du_comp = u_i_comp - u_j, dv_comp = v_i_comp - v_j; // 두 프레임 간의 추정된 2D 위치 차이를 계산
 
-    ans = max(ans, sqrt(min(du * du + dv * dv, du_comp * du_comp + dv_comp * dv_comp)));
+    ans = max(ans, sqrt(min(du * du + dv * dv, du_comp * du_comp + dv_comp * dv_comp))); //두 위치 차이의 유클리드 거리 중 큰 값을 ans에 저장
 
-    return ans;
+    return ans; // 거리 반환
 }

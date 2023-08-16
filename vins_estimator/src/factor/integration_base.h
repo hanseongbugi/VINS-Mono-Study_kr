@@ -37,18 +37,18 @@ class IntegrationBase
 
     void repropagate(const Eigen::Vector3d &_linearized_ba, const Eigen::Vector3d &_linearized_bg)
     {
-        sum_dt = 0.0;
+        sum_dt = 0.0; // dt및 자이로, 가속도 값, 속도 등 초기화
         acc_0 = linearized_acc;
         gyr_0 = linearized_gyr;
         delta_p.setZero();
         delta_q.setIdentity();
         delta_v.setZero();
-        linearized_ba = _linearized_ba;
+        linearized_ba = _linearized_ba; // bias 갱신
         linearized_bg = _linearized_bg;
         jacobian.setIdentity();
         covariance.setZero();
-        for (int i = 0; i < static_cast<int>(dt_buf.size()); i++)
-            propagate(dt_buf[i], acc_buf[i], gyr_buf[i]);
+        for (int i = 0; i < static_cast<int>(dt_buf.size()); i++) 
+            propagate(dt_buf[i], acc_buf[i], gyr_buf[i]); // integration 진행
     }
 
     void midPointIntegration(double _dt, 
@@ -70,7 +70,7 @@ class IntegrationBase
         result_linearized_ba = linearized_ba; // bias 갱신
         result_linearized_bg = linearized_bg; // bias 갱신
 
-        if(update_jacobian)
+        if(update_jacobian) // bias 값 갱신 
         {
             Vector3d w_x = 0.5 * (_gyr_0 + _gyr_1) - linearized_bg;
             Vector3d a_0_x = _acc_0 - linearized_ba;

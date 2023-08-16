@@ -257,7 +257,7 @@ void process()
                     ROS_ASSERT(dt_1 + dt_2 > 0); // dt_1 + dt_2가 0 이하인 경우 종료
                     double w1 = dt_2 / (dt_1 + dt_2); //dt_1과 dt_2의 가중치를 구함
                     double w2 = dt_1 / (dt_1 + dt_2);
-                    dx = w1 * dx + w2 * imu_msg->linear_acceleration.x; // 가중치를 통해 값을 혼합하여 자이로 가속도 값을 추정
+                    dx = w1 * dx + w2 * imu_msg->linear_acceleration.x; // 가중치를 통해 값을 혼합하여 자이로, 가속도 값을 추정 (interpolation)
                     dy = w1 * dy + w2 * imu_msg->linear_acceleration.y;
                     dz = w1 * dz + w2 * imu_msg->linear_acceleration.z;
                     rx = w1 * rx + w2 * imu_msg->angular_velocity.x;
@@ -296,39 +296,39 @@ void process()
 
             ROS_DEBUG("processing vision data with stamp %f \n", img_msg->header.stamp.toSec());
 
-            TicToc t_s;
-            map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> image;
-            for (unsigned int i = 0; i < img_msg->points.size(); i++)
+            TicToc t_s; // 현재 스레드 실행 시간 저장
+            map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> image; // image 정보를 담는 컨테이너
+            for (unsigned int i = 0; i < img_msg->points.size(); i++) // frame의 특징 점 개수만큼 loop
             {
-                int v = img_msg->channels[0].values[i] + 0.5;
-                int feature_id = v / NUM_OF_CAM;
-                int camera_id = v % NUM_OF_CAM;
-                double x = img_msg->points[i].x;
+                int v = img_msg->channels[0].values[i] + 0.5; //특징 점의 id를 가져온다. (p_id * NUM_OF_CAM + i)
+                int feature_id = v / NUM_OF_CAM; // 특징점 id 계산 (카메라 수에 따라 id를 나눈다, id 생성 시 cam 수를 곱했기 때문)
+                int camera_id = v % NUM_OF_CAM; // 카메라 id 계산
+                double x = img_msg->points[i].x; // 특징점의 x, y, z를 가져옴
                 double y = img_msg->points[i].y;
                 double z = img_msg->points[i].z;
-                double p_u = img_msg->channels[1].values[i];
-                double p_v = img_msg->channels[2].values[i];
-                double velocity_x = img_msg->channels[3].values[i];
-                double velocity_y = img_msg->channels[4].values[i];
-                ROS_ASSERT(z == 1);
+                double p_u = img_msg->channels[1].values[i]; //이전 프레임에서의 특징점 위치 중 x 값
+                double p_v = img_msg->channels[2].values[i]; // 이전 프레임에서의 특징점 위치 중 y 값
+                double velocity_x = img_msg->channels[3].values[i]; //특징점을 통해 구한 속도 x
+                double velocity_y = img_msg->channels[4].values[i]; // 특징점을 통해 구한 속도 y
+                ROS_ASSERT(z == 1); // z가 1이 아닌 경우 프로그램 종료
                 Eigen::Matrix<double, 7, 1> xyz_uv_velocity;
-                xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y;
-                image[feature_id].emplace_back(camera_id,  xyz_uv_velocity);
+                xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y; // 행렬에 값을 삽입
+                image[feature_id].emplace_back(camera_id,  xyz_uv_velocity); // 특징점 id에 해당하는 행렬을 배열에 삽입
             }
-            estimator.processImage(image, img_msg->header);
+            estimator.processImage(image, img_msg->header); // parallax 및 triangulate, optimzation 계산, 만약 RIC행렬이 없으면 RIC 행렬 추정 (imu와 cam 간의 rotation 행렬)
 
-            double whole_t = t_s.toc();
-            printStatistics(estimator, whole_t);
+            double whole_t = t_s.toc(); // 스레드 동작 시간 반환
+            printStatistics(estimator, whole_t); // 현재 실행 시 디버그 모드인 경우 위치, 방향, Tio, Ric를 출력
             std_msgs::Header header = img_msg->header;
             header.frame_id = "world";
 
-            pubOdometry(estimator, header);
+            pubOdometry(estimator, header); // 해당 node에서 연산한 결과를 다른 node로 전송
             pubKeyPoses(estimator, header);
             pubCameraPose(estimator, header);
             pubPointCloud(estimator, header);
             pubTF(estimator, header);
-            pubKeyframe(estimator);
-            if (relo_msg != NULL)
+            pubKeyframe(estimator); // 여기서 keyFrame은 WINDOW 크기 내에 있는 frame을 의미함 (슬라이딩 윈도우를 통해 전송할 keyFrame 변경)
+            if (relo_msg != NULL) // relocalization을 수행해야하는 경우
                 pubRelocalization(estimator);
             //ROS_ERROR("end: %f, at %f", img_msg->header.stamp.toSec(), ros::Time::now().toSec());
         }
