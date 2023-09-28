@@ -2,6 +2,7 @@
 * Vins-Mono를 공부하고 코드에 주석 처리 하였습니다.
 * 작업한 부분 까지  계속 commit 중입니다.
 * ORB SLAM3로 공부 방향을 변경하여 commit을 종료합니다.
+* VINS-MONO와 ORB SLAM3를 병합하는 방법을 연구중입니다.
 
 
 # VINS-Mono
